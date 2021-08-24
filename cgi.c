@@ -22,7 +22,7 @@ static int g_session_nstored = 0;
 	"PRIMARY KEY(session_id, key)" \
 	");"
 
-#define SESSION_BASE 36
+#define SESSION_BASE 16
 
 #define SET_SESSION_SQL "INSERT INTO sessions (session_id, key, value) " \
 	"VALUES(?, ?, ?) " \
@@ -173,7 +173,11 @@ void init_session()
 	}
 
 	if (changed_session)
-		set_cookie_int("SESSION", g_session_id);
+	{
+		char session_base[64];
+		snprintf(session_base, 64, "%lx", g_session_id);
+		set_cookie("SESSION", session_base);
+	}
 }
 
 void set_session(char *key, char *value)

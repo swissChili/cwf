@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#ifndef TL_NO_SQLITE
+#include <sqlite3.h>
+#endif
+
 struct tl_val
 {
 	enum
@@ -48,7 +52,7 @@ struct tl_val tl_gets(struct tl_val haystack, char *needle);
 struct tl_val tl_geti(struct tl_val haystack, int needle);
 
 bool tl_to_bool(struct tl_val val);
-void tl_write(FILE *to, struct tl_val val);
+void tl_write(FILE *to, struct tl_val val, bool html_escape);
 void tl_eval(FILE *from, FILE *to, struct tl_val ctx);
 
 struct tl_val tl_expr(struct tl_val ctx, char *expr);
@@ -57,8 +61,17 @@ struct tl_val tl_list();
 struct tl_val tl_env();
 struct tl_val tl_string(char *string);
 struct tl_val tl_int(int val);
+struct tl_val tl_null();
 
 void tl_append(struct tl_val *list, struct tl_val value);
 void tl_set(struct tl_val *env, char *key, struct tl_val value);
 
 void tl_free(struct tl_val val);
+
+#ifndef TL_NO_SQLITE
+
+struct tl_val tl_sqlite_row(sqlite3_stmt *stmt);
+struct tl_val tl_sqlite_column(sqlite3_stmt *stmt, int column_index);
+struct tl_val tl_sqlite_all_rows(sqlite3_stmt *stmt);
+
+#endif

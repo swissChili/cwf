@@ -147,17 +147,27 @@ void tl_eval(FILE *from, FILE *to, struct tl_val ctx)
 
 				return;
 			}
-			else if (n == '{')
+			else if (n == '{' || n == ':')
 			{
+				bool escape = n == '{';
+
+				if (n == ':')
+				{
+					fgetc(from);
+					if (peek(from) != '{')
+						die("Expected { after @:");
+				}
+				
 				fgetc(from);
 				char *expr = read_to(from, '}');
 				struct tl_val val = tl_expr(ctx, expr);
 				free(expr);
 
-				tl_write(to, val);
+				tl_write(to, val, escape);
 			}
-			else if (n == '?')
+			else if (n == '?' || n == '!')
 			{
+				bool negate = n == '!';
 				fgetc(from);
 
 				if (peek(from) != '{')
@@ -168,7 +178,9 @@ void tl_eval(FILE *from, FILE *to, struct tl_val ctx)
 				struct tl_val val = tl_expr(ctx, expr);
 				free(expr);
 
-				if (tl_to_bool(val))
+				bool bool_val = tl_to_bool(val);
+
+				if (negate ? !bool_val : bool_val)
 				{
 					tl_eval(from, to, ctx);
 				}
@@ -260,6 +272,14 @@ struct tl_val tl_int(int i)
 	return val;
 }
 
+struct tl_val tl_null()
+{
+	return (struct tl_val)
+		{
+			.type = TL_NULL,
+		};
+}
+
 void tl_append(struct tl_val *list, struct tl_val value)
 {
 	if (list->type != TL_LIST)
@@ -330,11 +350,37 @@ void tl_free(struct tl_val val)
 		free(val.v_str);
 }
 
-void tl_write(FILE *to, struct tl_val val)
+void write_html_escape(FILE *to, char *string, bool escape)
+{
+	if (escape)
+	{
+		for (; *string; string++)
+		{
+			char c = *string;
+
+			if (c == '<')
+				fprintf(to, "&lt;");
+			else if (c == '&')
+				fprintf(to, "&amp;");
+			else if (c == '>')
+				fprintf(to, "&gt;");
+			else if (c == '"')
+				fprintf(to, "&quot;");
+			else
+				fputc(c, to);
+		}
+	}
+	else
+	{
+		fprintf(to, "%s", string);
+	}
+}
+
+void tl_write(FILE *to, struct tl_val val, bool html_escape)
 {
 	if (val.type == TL_STR)
 	{
-		fprintf(to, "%s", val.v_str);
+		write_html_escape(to, val.v_str, html_escape);
 	}
 	else if (val.type == TL_INT)
 	{
@@ -346,7 +392,7 @@ void tl_write(FILE *to, struct tl_val val)
 
 		for (struct tl_list *list = val.v_list; list; list = list->next)
 		{
-			tl_write(to, list->val);
+			tl_write(to, list->val, html_escape);
 			fprintf(to, ", ");
 		}
 
@@ -358,8 +404,9 @@ void tl_write(FILE *to, struct tl_val val)
 
 		for (struct tl_env *env = val.v_env; env; env = env->next)
 		{
-			fprintf(to, "%s = ", env->key);
-			tl_write(to, env->val);
+			write_html_escape(to, env->key, html_escape);
+			fprintf(to, " = ");
+			tl_write(to, env->val, html_escape);
 			fprintf(to, ", ");
 		}
 		

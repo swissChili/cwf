@@ -2,3 +2,6 @@ public/main
 doc/*
 !doc/*.scd
 *.db
+GPATH
+GRTAGS
+GTAGS
